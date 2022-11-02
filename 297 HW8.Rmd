@@ -1,0 +1,173 @@
+---
+title: "Homework 8"
+author: "Xinqian Dai"
+date: "10/31/2021"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+chooseCRANmirror(graphics=FALSE, ind=1)
+library(formatR)
+knitr::opts_chunk$set(tidy.opts = list(width.cutoff = 60), tidy = TRUE)
+```
+
+
+```{r set up workspace}
+library(ggplot2)
+library(tidyverse)
+library(moderndive)
+library(skimr)
+library(infer)
+library(dbplyr)
+setwd("~/Desktop")
+load(file="covid_example_population.RData")
+load(file="US_COVID19_21_10_26.RData")
+```
+
+##1
+
+###a
+```{r}
+sample1 <- covid_pop %>% sample_n(1000)
+sample1 %>% summarize(infectedprop=sum(infected=="infected")/1000) 
+```
+###b
+```{r}
+bootstrap_distribution <- sample1 %>% specify(response = infected, success = "infected") %>% generate(reps = 1000, type = "bootstrap") %>% calculate(stat = "prop")
+
+percentile_ci <- bootstrap_distribution %>% get_confidence_interval(level = 0.90, type = "percentile")
+percentile_ci
+visualize(bootstrap_distribution) + shade_confidence_interval(endpoints = percentile_ci )+labs(x = "Stat", y = "Count", title = "size 1000 90% percentile bootstrap")
+
+```
+90% CI: (0.027, 0.046)
+
+### c
+```{r}
+standard_error_ci <- bootstrap_distribution %>% get_confidence_interval(level = 0.9, type = "se", point_estimate = 0.032)
+
+standard_error_ci
+
+visualize(bootstrap_distribution) + shade_confidence_interval(endpoints = standard_error_ci)+labs(x = "Stat", y = "Count", title = "se bootstrap")
+
+```
+90% CI: (0.0224, 0.0416)
+
+###d
+```{r}
+percentile_ci <- bootstrap_distribution %>% get_confidence_interval(level = 0.99, type = "percentile")
+percentile_ci
+visualize(bootstrap_distribution) + shade_confidence_interval(endpoints = percentile_ci )+labs(x = "Stat", y = "Count", title = "size 1000 99% percentile bootstrap")
+
+
+percentile_ci <- bootstrap_distribution %>% get_confidence_interval(level = 0.80, type = "percentile")
+percentile_ci
+visualize(bootstrap_distribution) + shade_confidence_interval(endpoints = percentile_ci )+labs(x = "Stat", y = "Count", title = "size 1000 80% percentile bootstrap")
+
+```
+99% percentile bootstrap confidence interval is the widest and 80% percentile bootstrap confidence interval is the narrowest. That's because higher confidence levels tend to produce wider confidence intervals. 99% CI means that we are 99% confident that the true mean is in the interval while 80% CI means we are 80% confident that the true mean is fall into the interval, so it is narrower than 99%CI.
+
+###e
+```{r}
+bootstrap_distribution2 <- sample1 %>% specify(response = infected, success = "infected") %>% generate(reps = 1000, type = "bootstrap") %>% calculate(stat = "prop")
+
+percentile_ci <- bootstrap_distribution2 %>% get_confidence_interval(level = 0.90, type = "percentile")
+percentile_ci
+visualize(bootstrap_distribution2) + shade_confidence_interval(endpoints = percentile_ci )+labs(x = "Stat", y = "Count", title = "size 1000 90% percentile bootstrap")
+
+bootstrap_distribution3 <- sample1 %>% specify(response = infected, success = "infected") %>% generate(reps = 1000, type = "bootstrap") %>% calculate(stat = "prop")
+
+percentile_ci <- bootstrap_distribution3 %>% get_confidence_interval(level = 0.90, type = "percentile")
+percentile_ci
+visualize(bootstrap_distribution3) + shade_confidence_interval(endpoints = percentile_ci )+labs(x = "Stat", y = "Count", title = "size 1000 90% percentile bootstrap")
+
+
+bootstrap_distribution4 <- sample1 %>% specify(response = infected, success = "infected") %>% generate(reps = 1000, type = "bootstrap") %>% calculate(stat = "prop")
+
+percentile_ci <- bootstrap_distribution4 %>% get_confidence_interval(level = 0.90, type = "percentile")
+percentile_ci
+visualize(bootstrap_distribution4) + shade_confidence_interval(endpoints = percentile_ci )+labs(x = "Stat", y = "Count", title = "size 1000 90% percentile bootstrap")
+
+```
+The intervals and lengths are not the same but not much different from each other. That is because the re-samples from the same original sample cannot be promised to be exactly the same as each other.
+
+###f
+```{r}
+sample2 <- covid_pop %>% sample_n(1000)
+bootstrap_distribution5 <- sample2 %>% specify(response = infected, success = "infected") %>% generate(reps = 1000, type = "bootstrap") %>% calculate(stat = "prop")
+
+percentile_ci <- bootstrap_distribution5 %>% get_confidence_interval(level = 0.90, type = "percentile")
+percentile_ci
+visualize(bootstrap_distribution5) + shade_confidence_interval(endpoints = percentile_ci ) + labs(x = "Stat", y = "Count", title = "size 1000 90% percentile bootstrap")
+
+
+sample3 <- covid_pop %>% sample_n(1000)
+bootstrap_distribution6 <- sample3 %>% specify(response = infected, success = "infected") %>% generate(reps = 1000, type = "bootstrap") %>% calculate(stat = "prop")
+
+percentile_ci <- bootstrap_distribution6 %>% get_confidence_interval(level = 0.90, type = "percentile")
+percentile_ci
+visualize(bootstrap_distribution6) + shade_confidence_interval(endpoints = percentile_ci )+ labs(x = "Stat", y = "Count", title = "size 1000 90% percentile bootstrap")
+
+
+sample4 <- covid_pop %>% sample_n(1000)
+bootstrap_distribution7 <- sample4 %>% specify(response = infected, success = "infected") %>% generate(reps = 1000, type = "bootstrap") %>% calculate(stat = "prop")
+
+percentile_ci <- bootstrap_distribution7 %>% get_confidence_interval(level = 0.90, type = "percentile")
+percentile_ci
+visualize(bootstrap_distribution7) + shade_confidence_interval(endpoints = percentile_ci ) + labs(x = "Stat", y = "Count", title = "size 1000 90% percentile bootstrap")
+
+
+```
+The intervals and lengths are not the same and they are more different from each other from the previous part because these re-samples don't even have the same original sample.
+
+
+###g
+```{r}
+sample5 <- covid_pop %>% sample_n(2000)
+bootstrap_distribution8 <- sample5 %>% specify(response = infected, success = "infected") %>% generate(reps = 2000, type = "bootstrap") %>% calculate(stat = "prop")
+
+percentile_ci <- bootstrap_distribution8 %>% get_confidence_interval(level = 0.90, type = "percentile")
+percentile_ci
+visualize(bootstrap_distribution8) + shade_confidence_interval(endpoints = percentile_ci )+ labs(x = "Stat", y = "Count", title = "size 2000 90% percentile bootstrap")
+```
+This confidence interval is narrower than that in part b.
+
+###h
+```{r}
+covid_pop %>% summarize(infectedprop=sum(infected=="infected")/10000) 
+```
+All my intervals above captured the truth as I expected, but since we use random samplings, we cannot guarantee that our graphs will always capture the truth.
+
+
+##2
+
+Each of the confidence intervals either does or doesn’t contain the true parameter so the probability is either a 1 or a 0, the confidence interval only represents our confidence in capturing the truth.
+
+
+##3
+
+###a
+```{r}
+us_counties <- us_counties %>% mutate(cases_per_100000 = cases / pop_2019 * 100000)
+us_counties %>% group_by(region) %>% summarise(mean = mean(cases_per_100000), sd = sd(cases_per_100000))
+```
+###b
+```{r}
+neandwregion <- us_counties %>% filter(region %in% c("Northeast","West"))
+bootstrap <- neandwregion %>% specify(formula = cases_per_100000 ~ region) %>% generate(reps = 1000, type = "bootstrap") %>% calculate(stat = "diff in means",order = c("Northeast", "West"))
+percentile_ci_new <- bootstrap %>% get_confidence_interval(level = 0.90, type = "percentile")
+percentile_ci_new
+visualize(bootstrap) + shade_confidence_interval(endpoints = percentile_ci_new)+ labs(x = "Cases per 100000", y = "Count", title = "Bootstrap for the difference in mean county cases per 100000")
+```
+0 is not part of my interval and it is not plausible that the mean county COVID rates are not different between the northeast and west.
+
+
+###c
+```{r}
+us_counties %>% group_by(region) %>% summarise(averages_over_people = sum(cases) / sum(pop_2019) * 100000)
+```
+Why do you think they are larger/smaller?
+
+The rate of COVID cases per 100000 people in Northeast is higher than the county-wide averages while the rate in other 3 regions is lower than the county-wide averages. Maybe that's because the size of counties in Northeast is relatively small and it leads to a small county-wide average.
+

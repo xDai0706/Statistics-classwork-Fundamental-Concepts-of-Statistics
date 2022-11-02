@@ -1,0 +1,161 @@
+---
+title: "Homework 5"
+author: "Xinqian Dai"
+date: "10/10/2021"
+output:
+  word_document: default
+  pdf_document: default
+---
+```{r setup, include=FALSE}
+library(formatR)
+knitr::opts_chunk$set(tidy.opts = list(width.cutoff = 60), tidy = TRUE)
+knitr::opts_chunk$set(echo = TRUE)
+chooseCRANmirror(graphics=FALSE, ind=1)
+```
+
+```{r set up workspace}
+library(ggplot2)
+library(dplyr)
+library(gridExtra)
+library(zoo)
+library(tinytex)
+library(lubridate)
+library(tidyverse)
+library(moderndive)
+library(skimr)
+setwd("/Users/demix9/Desktop")
+load(file="MA_COVID19_21_09_28.RData")
+load(file="MA_county_variables_2020.RData")
+```
+
+
+```{r make_variables}
+load(file="MA_COVID19_21_10_05.RData")
+load(file="MA_county_variables_2020.RData")
+
+ma_extra <- ma_extra %>% mutate(pct_over_85=100*X2019_age_85_plus/X2019_pop_est)
+ma_extra <- ma_extra %>% mutate(pct_white=100*pct_NHWA_2019)
+ma_extra <- ma_extra %>% mutate(pct_nonwhite=100-pct_white)
+
+mass_total_deaths_cases <- mass %>% filter(date==max(date)) %>% select(county, deaths, cases)
+
+ma_extra <- ma_extra %>% inner_join(mass_total_deaths_cases, by="county")
+
+ma_extra <- ma_extra %>% mutate(cases_per_capita=cases/X2019_pop_est,
+ deaths_per_capita=deaths/X2019_pop_est)
+
+ma_extra <- ma_extra %>% mutate(deaths_per_100000 = 100000*deaths_per_capita)
+ma_extra <- ma_extra %>% mutate(cases_per_100000 = 100000*cases_per_capita)
+
+ma_extra <- ma_extra %>% mutate(region=case_when(
+ county %in% c("Hampshire", "Franklin", "Hampden","Berkshire", "Worcester") ~ "West",
+ #county %in% c("Worcester") ~ "Central",
+ county %in% c("Essex", "Middlesex", "Suffolk","Norfolk") ~ "East",
+ county %in% c("Bristol", "Plymouth", "Barnstable", "Dukes", "Nantucket") ~ "Cape"
+) )
+
+```
+## 1
+
+### a
+
+```{r}
+glimpse(ma_extra)
+ma_extra %>% sample_n(size = 1)
+toSkim <- ma_extra %>% select(people_per_Housing, region, deaths_per_100000)
+skim_without_charts(toSkim)
+table(ma_extra$region)
+ma_extra %>% ggplot(aes(x = people_per_Housing, y = deaths_per_100000)) + geom_point()+ ggtitle("Deaths per 100000 vs People per housing")+labs(x = "People per housing", y = "Deaths per 100000") + geom_smooth(method = "lm", se = FALSE) 
+ma_extra %>% ggplot(aes(x = people_per_Housing, y = deaths_per_100000, color = region)) + geom_point()+ ggtitle("Deaths per 100000 vs People per housing")+labs(x = "People per housing", y = "Deaths per 100000", color = "Region")+ geom_smooth(method = "lm", se = FALSE) 
+ma_extra %>% ggplot(aes(x = region, y = people_per_Housing)) + geom_point()+ ggtitle("People per housing by Region")+labs(x = "Region", y = "People per housing", color = "Region")+ geom_smooth(method = "lm", se = FALSE) 
+```
+According to the second graph, the two predictor variables are not related to each other.
+
+### b
+
+```{r}
+interaction_model <- lm(deaths_per_100000 ~ region * people_per_Housing, data = ma_extra)
+get_regression_table(interaction_model)
+
+```
+
+$\hat{y}=b_0 + b_1*PPH + b_2 *(East or not) + b_3 (West or not) + b_4 (PPH* East or not) + b_5 (PPH* West or not) = -119.549 + 180.665* PPH - 149.306(East or not) + 219.303 (West or not) + 35.384(PPH * East or not) -113.661(PPH * West or not)$
+The coefficient of Cape is 0.011,
+The coefficient of East is 0.011+0.031 = 0.042,
+The coefficient of West is 0.011+0.008 = 0.019.
+
+### c
+For Cape :
+$\hat{y}= -119.549 + 180.665* PPH $ 
+For East :
+$\hat{y}= -119.549 + 180.665* PPH - 149.306 + 35.384* PPH = -268.855 + 216.049* PPH$  
+For West :
+$\hat{y}= -119.549 + 180.665* PPH + 219.303 - 113.661* PPH = 99.754 + 67.004* PPH$
+
+### d
+```{r}
+ma_extra %>% ggplot(aes(x = people_per_Housing, y = deaths_per_100000, color = region)) + geom_point()+ ggtitle("People per housing by Region")+labs(x = "Region", y = "People per housing", color = "Region")+ geom_parallel_slopes(se = FALSE) 
+```
+Yes. They seem much different because the three lines in the first graph have very different slopes.
+
+### e
+```{r}
+parallel_model <- lm(deaths_per_100000 ~ region + people_per_Housing, data = ma_extra)
+get_regression_table(parallel_model)
+```
+
+$\hat{y}=b_0 + b_1*PPH + b_2 (East or not) + b_3 (West or not) = -96.150 +166.079* PPH -49.775(East or not) -26.390 (West or not)$
+
+### f
+$Cape:\hat{y}= -96.150+ 166.079 * PPH$
+$East:\hat{y}=-96.150 + 166.079 * PPH -49.775 = 145.925 + 166.079 * PPH$
+$West:\hat{y}=-96.150 + 166.079 * PPH -26.390 = 122.540 + 166.079 * PPH$
+
+There’s no people_per_Housing:regionEast and people_per_Housing:regionWest in this fit and the coefficients for the three regions are the same.
+
+### g
+```{r}
+ppt_only <- lm(deaths_per_100000 ~ people_per_Housing, data = ma_extra)
+region_only <- lm(deaths_per_100000 ~ region, data = ma_extra)
+sse_ppt_only <- get_regression_points(ppt_only) %>% select(residual) %>% mutate(squared_error = residual ^2) %>% summarize(sum(squared_error))
+sse_region_only <- get_regression_points(region_only) %>% select(residual) %>% mutate(squared_error = residual ^2) %>% summarize(sum(squared_error))
+sse_interaction_model <- get_regression_points(interaction_model) %>% select(residual) %>% mutate(squared_error = residual ^2) %>% summarize(sum(squared_error))
+sse_parallel_model <- get_regression_points(parallel_model) %>% select(residual) %>% mutate(squared_error = residual ^2) %>% summarize(sum(squared_error))
+sses <- c(sse_ppt_only,sse_region_only, sse_interaction_model, sse_parallel_model )
+sse_names <- c("PPT only" , "Region only", "Interaction model", "Paralle Slopes model")
+names(sses) <- sse_names
+knitr::kable(as.matrix(sses), row.names = T)
+```
+### h
+Region only explains more variation; 
+Yes, adding the second variable substantially improves the model fit because the SSE is smaller after adding the variable;
+No, the interaction model doesn't substantially improve the model fit beyond the parallel slopes model fit because its SSE is just slightly smaller than that of the parallel sloped model;
+I prefer parallel sloped model because its SSE is almost the same as the interaction model but it's much more simple.
+
+
+
+## 2
+
+### a
+Simpson's paradox is a phenomenon in which a trend appears in several groups of data but disappears or reverses when the groups are combined. 
+
+### b
+
+We could see below that Deaths_per_100000 for east region is the most and Deaths_per_100000 for West is the second greatest but this is not always true with different PPHs so there's a paradox.
+
+```{r}
+ma_extra %>% group_by(region) %>%ggplot(aes(x = region, y = deaths_per_100000)) + geom_boxplot()+ ggtitle("Deaths per 100000 by Region")+labs(x = "Region", y = "Deaths per 100000")
+
+ma_extra %>% ggplot(aes(x = region, y = deaths_per_100000, color = people_per_Housing)) + geom_point()+ ggtitle("Deaths per 100000 by Region")+labs(x = "Region", y = "Deaths per 100000", color = "PPH")+ geom_parallel_slopes(se = FALSE) 
+```
+
+### c
+Suppose we’re in the soft drinks industry and we’re trying to choose between two new flavors we’ve produced. We could sample public opinion on the two flavors — let’s say we choose to do so by setting up two sampling stalls for each flavor in a busy area and asking 1000 people at each stall if they enjoy the new flavor.
+
+We can see that 80% of people enjoyed ‘Sinful Strawberry’ whereas only 75% of people enjoyed ‘Passionate Peach’. So ‘Sinful Strawberry’ is more likely to be the preferred flavor.
+Now, suppose our marketing team collected some other information while conducting the survey, such as the sex of the person sampling the drink. 
+
+This suggests that 84.4% of men and 40% of women liked ‘Sinful Strawberry’ whereas 85.7% of men and 50% of women liked ‘Passionate Peach’. According to our sample data, generally people prefer ‘Sinful Strawberry’, but both men and women separately prefer ‘Passionate Peach’. 
+
+Resource: https://towardsdatascience.com/simpsons-paradox-and-interpreting-data-6a0443516765#:~:text=One%20of%20the%20most%20famous,35%25%20of%20their%20female%20applicants.
+

@@ -1,0 +1,196 @@
+---
+title: "Homework 9"
+author: "Xinqian Dai"
+date: "11/6/2021"
+output:
+  word_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+# this just sets it so the default is that we get to see output of each section
+knitr::opts_chunk$set(echo = TRUE)
+chooseCRANmirror(graphics=FALSE, ind=1)
+```
+
+```{r set up workspace}
+library(tidyverse)
+library(moderndive)
+library(skimr)
+library(infer)
+library(dplyr)
+setwd("~/Desktop")
+load(file = "MA_COVID19_21_11_02.RData")
+```
+
+## 1a
+
+In statistic, we have null hypotheses, which is a claim, and alternative hypotheses, which is what we believe when the null hypotheses is not true. The p value is the probability that the null hypotheses would be rejected.
+
+
+## 2a
+
+```{r}
+before <- mass_totals %>% filter(date >= "2020-04-08" & date < "2020-05-06")
+after <- mass_totals %>% filter(date > "2020-05-16" & date <= "2020-06-13")
+
+before <- before %>% add_column(masks = "FALSE")
+after <- after %>% add_column(masks = "TRUE")
+mask_require <- bind_rows(before, after)
+glimpse(mask_require)
+
+```
+
+## 2b
+
+Null: there's no difference in means between before and after the mask order.
+$m_before = m_after$
+Alternative: there's a difference in means between before and after the mask order.
+$m_before < m_after or m_before > m_after$
+Test statistic: the difference between the means of new cases before and after.
+$m_before - m_after$
+
+```{r}
+null_distribution <- mask_require %>% 
+  specify(formula = new_cases ~ masks) %>% 
+  hypothesize(null = "independence") %>% 
+  generate(reps = 1000, type = "permute") %>% 
+  calculate(stat = "diff in means", order = c("FALSE", "TRUE"))
+visualize(null_distribution) +
+  labs(x = "Difference in means", y = "Count", title="Hypothesis Distribution")
+```
+
+## 2c
+
+The box plot shows the difference of new_cases before and after the mask order. 
+The new cases decreases after the mask order as I expected, so the result should be rejecting null hypothesis.
+
+```{r}
+ggplot(data = mask_require, mapping = aes(x = factor(masks), y = new_cases)) + geom_boxplot() + labs(x = "Mask require", y = "New Cases",
+title = "New cases before and after the mask order")
+```
+
+## 2d
+
+```{r}
+obs_two_sample_t <- mask_require %>% 
+  specify(formula = new_cases ~ masks) %>% 
+  calculate(stat = "diff in means", order = c("TRUE", "FALSE"))
+obs_two_sample_t
+
+null_distribution <- mask_require %>% 
+  specify(formula = new_cases ~ masks) %>%
+  hypothesise(null = "independence") %>%
+  generate (reps = 1000, type = "permute") %>%
+  calculate(stat = "diff in means", order = c("TRUE", "FALSE"))
+
+
+null_distribution %>% visualize() + shade_p_value(obs_stat = obs_two_sample_t, direction = "two-sided") +
+  labs(x = "Difference in means", y = "Count", title="Hypothesis Distribution")
+
+
+```
+
+## 2e
+
+```{r}
+null_distribution %>% get_p_value(obs_stat = obs_two_sample_t, direction = "two-sided")
+```
+
+The p value is equal to 0 and less than the significance level $\alpha = .05$, so we reject the null hypotheses and conclude that there's difference between two means.
+
+
+## 3a
+I decided to use the same blocks of date in the last question and I'll only be looking at Hampshire and Franklin county since all the local colleges are located in these two counties.
+
+```{r}
+return <- nearby  %>% filter((date > "2020-08-03" & date < "2020-09-01" )|(date > "2020-09-11" & date < "2020-10-09" )) %>%
+  mutate(return = case_when (date < "2020-09-01"~ FALSE, date > "2020-09-01" ~ TRUE))
+
+glimpse(return)
+
+```
+
+## 3b
+I'll use a two sided test because it is possible that the new cases will either increase or decrease after students return to colleges. 
+Null: there's no difference in means between before and after students returned to colleges.
+$m_before = m_after$
+Alternative: there's a difference in means between before and after students returned to colleges.
+$m_before < m_after or m_before > m_after$
+Test statistic: the difference between the means of new cases before and after students returned to colleges.
+$m_before - m_after$
+I'll use $\alpha = .05$ for significance level because it's common used in hypothesis this test.
+
+## 3c
+The box plot shows the difference of new_cases before and after students returned to colleges. The new cases are not the same before and after the return date so I expect my result of test to be rejecting null hypothesis.
+
+```{r}
+ggplot(data = return, mapping = aes(x = factor(return), y = new_cases)) + geom_boxplot() + labs(x = "Return", y = "New Cases",
+title = "New cases before and after the return date")
+```
+## 3d
+
+```{r}
+obs_two_sample_t <- return %>% 
+  specify(formula = new_cases ~ return) %>% 
+  calculate(stat = "diff in means", order = c("TRUE", "FALSE"))
+obs_two_sample_t
+
+null_distribution <- return %>% 
+  specify(formula = new_cases ~ return) %>%
+  hypothesise(null = "independence") %>%
+  generate (reps = 1000, type = "permute") %>%
+  calculate(stat = "diff in means", order = c("TRUE", "FALSE"))
+
+
+null_distribution %>% visualize() + shade_p_value(obs_stat = obs_two_sample_t, direction = "two-sided") +
+  labs(x = "Difference in means", y = "Count", title="Hypothesis Distribution")
+
+
+```
+## 3e
+
+```{r}
+null_distribution %>% get_p_value(obs_stat = obs_two_sample_t, direction = "two-sided")
+```
+
+The p value is equal to 0.048 and less than the significance level $\alpha = .05$, so we reject the null hypotheses and conclude that there's difference between two means.
+
+##3f
+
+```{r}
+null_distribution %>% get_p_value(obs_stat = obs_two_sample_t, direction = "right")
+null_distribution %>% get_p_value(obs_stat = obs_two_sample_t, direction = "left")
+```
+The p value for left sided test is 0.98 > 0.5 so the direction of the effect ended up being in the opposite direction of my expectation and I would not reject the null hypotheses. But we couldn't conclude to accept the null hypothesis, more tests are needed.
+
+
+
+##4a
+I prefer B because it has higher false positive rate and lower false negative rate. In this case, false negative has a more severe consequence because some people who actually carry the virus cannot be detected.
+
+##4b
+A: positive tests: $0.01(0.67)+0.99(0.008) = 0.01462$ $0.01462(1000) = 14.62$ Approximately 15 tests.
+B: positive tests: $0.01(0.98)+0.99(0.04) = 0.049$ $0.049(1000) = 49$
+
+##4c
+A: True positive: $(0.01(0.67))(1000) = 6.7 6.7/86 = 0.078$
+B: True positive: $(0.01(0.98))(1000) = 9.8 9.8/ 49 = 0.2$
+True positive means people who test positive are indeed positive.
+
+##4d
+A: False positive: $(1000) ((1 − 0.01)(0.008)) = 7.92$
+B: False positive: $(1000) ((1 − 0.01)(0.04)) = 39.6$
+False positive means people who test positive are actually not positive.
+
+##4e
+A: False negative: $(0.01(0.33))(1000) = 3.3$
+B: False negative: $(0.01(0.02))(1000) = 0.2$
+False negative means people who test negative are actually positive.
+
+
+##4f
+The impact of false positive results includes risk of overestimating the COVID19 incidence, the demand on track and trace, and the extent of asymptomatic infection. 
+The impact of false negative results include: delayed or lack of supportive treatment, lack of monitoring of infected individuals and their household or other close contacts for symptoms resulting in increased risk of spread of COVID19 within the community.
+
+I prefer to use test B because there are only 1000 employees so the impact of false positive is not very severe but if there's a higher rate of false negative, the risk of spread of COVID in our firm would be increased and our productivity would be declined.

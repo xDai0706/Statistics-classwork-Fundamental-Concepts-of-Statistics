@@ -1,0 +1,292 @@
+---
+title: "HW10"
+author: "Zhibo Jia"
+date: "11/22/2021"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r set up workspace}
+library(tidyverse)
+library(moderndive)
+library(skimr)
+library(infer)
+library(usmap)
+library(maptools)
+library(rgdal)
+load(file = "MA_COVID19_21_11_09.RData")
+load(file = "MA_county_variables_2020.RData")
+```
+
+##1
+
+###a
+```{r}
+ma_extra <- ma_extra %>% 
+  mutate(pct_white=100*pct_NHWA_2019)
+ma_extra <- ma_extra %>% 
+  mutate(pct_nonwhite=100-pct_white)
+temp1<-mass%>%
+  filter(county!="Unknown" & date==max(date))%>%select(county,deaths)
+ma_extra<-ma_extra%>%inner_join(temp1,by="county")%>%
+  mutate(deaths_per_100000=deaths*100000/(X2019_pop_est))
+ma_extra%>%
+  ggplot(aes(y=deaths_per_100000,x=people_per_Housing))+
+  geom_point()+geom_smooth(method="lm",se=FALSE)
+model1<-lm(deaths_per_100000 ~ people_per_Housing, data = ma_extra)
+```
+
+###b
+
+```{r}
+get_regression_table(model1, conf.level = 0.95)
+```
+
+The 95% CI for $\beta_1$ is $(80.049, 216.641)$, which doesn't contain 0. The CI means we have 95% certain that the true value of the slope of people_per_housing lies within this interval.
+
+###c
+
+```{r}
+set.seed(1)
+null_distribution1<-ma_extra%>%
+  specify(formula = deaths_per_100000 ~ people_per_Housing)%>%
+  hypothesise(null="independence")%>%
+  generate(reps=1000, type="permute")%>%
+  calculate(stat ="slope")
+null_distribution1
+obs_stat1<-ma_extra%>%
+  specify(formula = deaths_per_100000 ~ people_per_Housing)%>%
+  calculate(stat ="slope")
+visualise(null_distribution1, bins=10)+ 
+  shade_p_value(obs_stat = obs_stat1, direction = "two-sided")
+
+null_distribution1 %>% 
+  get_p_value(obs_stat = obs_stat1, direction = "two-sided")
+```
+
+p-value is 0.004 which is less than 0.05, we reject null hypothesis.
+
+###d
+
+1. Linearity of relationship between variables
+2. Independence of the residuals
+3. Normality of the residuals
+4. Equality of variance of the residuals
+
+###e
+
+yes, based on the slope, we can see whether it is a positive or negative relationship.
+
+###f
+
+I don't think we need to concern about dependence between the residuals, since for two independent places' people per housing and death per 100000, the differences between observe value and mean are independent.
+
+###g
+
+```{r}
+model1%>%
+  ggplot(aes(x=.resid)) + geom_histogram(color="white")
+```
+There are 1 value close to -100, and 1 value greater than 100, which  makes me worried they are non-normal
+
+###h
+
+```{r}
+temp2<-fortify(model1)
+temp2%>%
+  ggplot(aes(x=people_per_Housing, y=.resid))+geom_point()+geom_hline(yintercept = 0)
+```
+
+The greater value of people_per_Housing, the closer residuals to 0. So, it can suggest variance may be unequal.
+
+###i
+
+```{r}
+temp3<-select(temp2, -people_per_Housing)
+temp3<-inner_join(temp3,ma_extra,by="deaths_per_100000")%>%
+  select(county, deaths_per_100000, people_per_Housing, 
+         .hat, .sigma, .cooksd, .fitted, .resid, .stdresid)
+temp3<-temp3%>%mutate(state="MA")
+temp4<-select(ma_extra, county, county_FIPS)
+temp3<-inner_join(temp3, temp4, by = "county")
+colnames(temp3)[10]<-"abbr"
+colnames(temp3)[11]<-"fips"
+temp5<-select(countypop, fips, county)
+temp3<-temp3%>%select(-county)
+temp3<- transform(temp3, fips=as.character(fips))
+temp3<-inner_join(temp3,temp5,by="fips")
+
+plot_usmap(region="counties", include = c("MA"),data=temp3, values=".resid", color="red")+ 
+  scale_fill_continuous(name = "residual", label = scales::comma) + 
+  theme(legend.position = "right")
+```
+
+###j
+
+```{r}
+temp2%>%
+  ggplot(aes(x=.fitted, y=.resid))+geom_point()+geom_hline(yintercept = 0)
+```
+
+The plot looks same as the one in part h.
+
+##2
+
+###a
+
+```{r}
+set.seed(3)
+bootstrap<-ma_extra %>%
+  specify(formula = deaths_per_100000 ~ people_per_Housing)%>%
+  generate(reps = 1000, type = "bootstrap")%>%
+  calculate(stat = "slope")
+
+visualize(bootstrap)
+```
+
+0 is at the min edge of the distribution, which seems like not a plausible value for $\beta_1$.
+
+###b
+
+```{r}
+set.seed(3)
+new1<-ma_extra %>%
+  specify(formula = deaths_per_100000 ~ people_per_Housing)%>%
+  generate(reps = 1000, type = "bootstrap")%>%
+  calculate(stat = "slope")
+
+endpoi1<-new1%>%
+  get_confidence_interval(level=0.95,type = "percentile")
+visualize(new1)+shade_confidence_interval(endpoints = endpoi1)
+
+x_bar<-ma_extra %>%
+  specify(formula = deaths_per_100000 ~ people_per_Housing)%>%
+  calculate(stat = "slope")
+endpoi<-bootstrap%>%
+  get_confidence_interval(level = 0.95, type = "se", point_estimate = x_bar)
+visualize(bootstrap)+shade_confidence_interval(endpoints = endpoi)
+```
+
+These plots are not same but close. The previous one is much close to percentile type. The percentile type has lower endpoints than se one.
+
+###c
+
+```{r}
+set.seed(3)
+null_distribution2<-ma_extra %>%
+  specify(formula = deaths_per_100000 ~ people_per_Housing)%>%
+  hypothesise(null = "independence")%>%
+  generate(reps = 1000, type = "permute")%>%
+  calculate(stat = "slope")
+obs_stat2<-ma_extra%>%
+  specify(formula = deaths_per_100000 ~ people_per_Housing)%>%
+  calculate(stat ="slope")
+
+visualise(null_distribution2, bins=10)+ 
+  shade_p_value(obs_stat = obs_stat2, direction = "two-sided")
+
+
+```
+The picture does not support the null hypothesis, since the p-value looks very low, it has more possibility to reject the null hypothesis.
+
+###d
+
+```{r}
+null_distribution2 %>% 
+  get_p_value(obs_stat = obs_stat2, direction = "two-sided")
+```
+It agrees with my expectations. It is same as the p value from question 1.
+
+###e
+
+The bootstrap shows the value from random picking without the expect value. However, null hypothesis expect the slope is 0, and use 0 as mean to build normal distribution, the center is 0.
+
+###f
+
+```{r}
+get_regression_table(model1, conf.level = 0.95)
+bootstrap%>%summarise(se=sd(stat))
+null_distribution2%>%summarise(se=sd(stat))
+```
+
+The one from bootstrap and the one from null distribution are similar. theory-based methods give the smallest value and null distribution gives the largest value.
+
+###g
+
+By resampling, there must be some differences between bootstrap and null distribution and theory based method. Also, for bootstrap and null distribution, they both do resampling 1000 times, the results should be similar.
+
+##3
+
+###a
+As median age increase, death per 100000 should increase, people per housing should decrease, pct nonwhite should decrease.
+Since high age level lead to a higher death rate, and fewer people live in one house. For nonwhite part, I just take a guess.
+
+As people per housing increase, death per 100000 should increase, median age decrease, pct nonwhite should increase.
+Since more people in one house, higher risk to get covid and lead to death.
+
+As pct nonwhite increase, death per 100000 should decrease, median age decrease, and people per housing increase.
+Based on previous expectations.
+###b
+
+The expectations are correct 7 of 9
+```{r}
+ma_extra%>%ungroup()%>%
+  select(deaths_per_100000, X2019_median_age, people_per_Housing, pct_nonwhite)%>%
+  cor()
+
+ma_extra%>%
+  ggplot(aes(x=X2019_median_age, y=deaths_per_100000))+geom_point()
+ma_extra%>%
+  ggplot(aes(x=people_per_Housing, y=deaths_per_100000))+geom_point()
+ma_extra%>%
+  ggplot(aes(x=pct_nonwhite, y=deaths_per_100000))+geom_point()
+
+ma_extra%>%
+  ggplot(aes(x=X2019_median_age, y=people_per_Housing))+geom_point()
+ma_extra%>%
+  ggplot(aes(x=X2019_median_age, y=pct_nonwhite))+geom_point()
+
+ma_extra%>%
+  ggplot(aes(x=people_per_Housing, y=pct_nonwhite))+geom_point()
+```
+
+###c
+
+```{r}
+ma_extra%>%ggplot(aes(x=X2019_median_age, y=deaths_per_100000))+
+  geom_point()+geom_smooth(method="lm", se=FALSE)
+model2<-lm(deaths_per_100000 ~ X2019_median_age, data=ma_extra)
+model2%>%get_regression_table()
+```
+$\hat{y}=418.409-4.439x$
+As the median age increase, death per 100000 decrease.
+
+###d
+
+```{r}
+model3<-lm(deaths_per_100000 ~ X2019_median_age + people_per_Housing, data=ma_extra)
+model3%>%get_regression_table()
+```
+$\hat{y}=-502.323+7.957x_1+191.086x_2$
+As the median age increase, death per 100000 increase.
+
+###e
+
+```{r}
+model4<-
+  lm(deaths_per_100000 ~ X2019_median_age + people_per_Housing + pct_nonwhite, data=ma_extra)
+model4%>%get_regression_table()
+```
+$\hat{y}=-1001.210+16.563x_1+208.026x_2+4.220x_3$
+As the median age increase, death per 100000 increase.
+
+###f
+
+The value in 3 models are not the same, the sign of first model is different from the other two. The significant increase from 1 to 3. Since by adding variables that have relationship with median age, it will change the slope of it. 
+
+###g
+
+Based on part b, we can see if only consider median age and death per 100000, the sign is negative, the significance is low since the correlation is far from 1. Since median age and people per housing have negative relationship and people per housing and death per 100000 have positive relationship, when we add it into model, the significance of median age increase, and the slope of median age should increase. Same thing for pct nonwhite. 

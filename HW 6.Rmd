@@ -1,0 +1,139 @@
+---
+title: "Homework 6"
+author: "Xinqian Dai"
+date: "10/16/2021"
+output: pdf_document
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+chooseCRANmirror(graphics=FALSE, ind=1)
+library(formatR)
+knitr::opts_chunk$set(tidy.opts = list(width.cutoff = 60), tidy = TRUE)
+setwd("~/Desktop")
+load(file="covid_example_population.RData")
+```
+
+
+
+
+```{r set up workspace}
+library(ggplot2)
+library(dplyr)
+library(gridExtra)
+library(zoo)
+library(tinytex)
+library(lubridate)
+library(tidyverse)
+library(moderndive)
+library(skimr)
+
+
+```
+
+
+
+## 1
+
+### a
+```{r}
+glimpse(covid_pop)
+covid_pop %>% sample_n(size = 100)
+```
+### b
+```{r}
+tested <- covid_pop %>% sample_n(500)
+tested %>% summarize (infectedsum = sum(infected=="infected")) %>% mutate(infectedpro = infectedsum/500 )
+```
+
+### c
+The proportion positive in the whole population is approximately equal to 0.3.It is random, representative and unbiased. It generalizes to the full population. The population parameter is the proportion positive in the whole population. The 10000 people got tested make up the study population.
+
+### d
+```{r}
+symptomatic <- covid_pop %>% filter(symptoms == "symptomatic") %>% sample_n(500)
+symptomatic %>% summarize (infectedsum2 = sum(infected=="infected")) %>% mutate(infectedpro2 = infectedsum2/500 )
+```
+
+### e
+It's not random, not representative and it's biased because we only considered about symptomatic people.It doesn't generalize to the full population.
+The symptomatic people got tested make up the study population. The population parameter is the proportion positive in the whole population. The 10000 people got tested make up the study population.
+A study population made up by only symptomatic people who got tested is more generalizable.
+
+
+### f
+I prefer the subset of symptomatic people because the positive proportion among symptomatic people is greater than asymptomatic people. If I only have 500 tests, testing symptomatic people would be more efficient and more meaningful to the public.
+
+### g
+```{r}
+contactorsymptomatic <- covid_pop %>% filter(symptoms == "symptomatic" | contact == "contact")
+contactorsymptomatic %>% summarize (infectedsum3 = sum(infected=="infected"), populationsum = sum(symptoms == "symptomatic" | contact == "contact")) %>% mutate(infectedpro3 = infectedsum3/ populationsum)
+```
+
+### h
+It's a census and the population is all people who were either symptomatic or had contact with someone infected.
+It is not representative of the whole population because it doesn't considers about the whole population.
+
+### i
+```{r}
+symptomatic2 <- covid_pop %>% filter(symptoms == "symptomatic")
+symptomatic2 %>% summarize (infectedsum4 = sum(infected=="infected"), populationsum2 = sum(symptoms == "symptomatic")) %>% mutate(infectedpro3 = infectedsum4/ populationsum2)
+```
+
+257-134 = 123;
+I find 123 more positives by testing contacts as well as symptomatics.
+
+### j
+I think the best estimate of the proportion of infected people in the population is the proportion of infected people in symptomatic people only. I think the proportion of infected people would be approximately equal to 0.22.
+I would prefer to test contacts as well as symptomatic if I'm trying to find as many cases as possible.
+
+
+## 2
+
+### a
+```{r}
+tested <- covid_pop %>% rep_sample_n(size=500, reps=1000)
+
+tested %>% group_by(replicate) %>% summarize(infected=sum(infected=="infected")) %>% mutate(prop_infected=infected/500) %>% ggplot(aes(x=prop_infected)) + geom_histogram(binwidth=.005, boundary=.02) + labs(x="Proportion Infected", y="Count", title="1000 samples of size 500")
+proportion <- tested %>% group_by(replicate) %>% summarize(infected=sum(infected=="infected")) %>% mutate(prop_infected=infected/500)
+```
+
+### b
+```{r}
+proportion %>% summarize(sd = sd(prop_infected))
+```
+standard error is approximately equal to 0.0075
+
+
+### c
+The standard deviation  measures the amount of variability, or dispersion, from the individual data values to the mean, while the standard error of the mean measures how far the sample mean of the data is likely to be from the true population mean.
+
+### d
+```{r}
+tested <- covid_pop %>% rep_sample_n(size=1000, reps=1000)
+tested %>% group_by(replicate) %>% summarize(infected=sum(infected=="infected")) %>% mutate(prop_infected=infected/1000) %>% ggplot(aes(x=prop_infected)) + geom_histogram(binwidth=.005, boundary=.02) + labs(x="Proportion Infected", y="Count", title="1000 samples of size 1000")
+proportion2 <- tested %>% group_by(replicate) %>% summarize(infected=sum(infected=="infected")) %>% mutate(prop_infected=infected/1000)
+proportion2 %>% summarize(sd = sd(prop_infected))
+```
+
+### e
+```{r}
+tested <- covid_pop %>% rep_sample_n(size=2500, reps=1000)
+tested %>% group_by(replicate) %>% summarize(infected=sum(infected=="infected")) %>% mutate(prop_infected=infected/2500) %>% ggplot(aes(x=prop_infected)) + geom_histogram(binwidth=.005, boundary=.02) + labs(x="Proportion Infected", y="Count", title="2500 samples of size 1000")
+proportion3 <- tested %>% group_by(replicate) %>% summarize(infected=sum(infected=="infected")) %>% mutate(prop_infected=infected/2500)
+proportion3 %>% summarize(sd = sd(prop_infected))
+```
+
+### f
+The plots are getting more and more concentrated and both the standard deviation and the standard error are getting smaller and smaller.
+
+
+### g
+```{r}
+tested <- covid_pop %>% filter(symptoms == "symptomatic") %>% rep_sample_n(size=500, reps=1000)
+tested %>% group_by(replicate) %>% summarize(infected=sum(infected=="infected")) %>% mutate(prop_infected=infected/500) %>% ggplot(aes(x=prop_infected)) + geom_histogram(binwidth=.005, boundary=.02) + labs(x="Proportion Infected", y="Count", title="1000 samples of size 500 symptomatic people only")
+proportion4 <- tested %>% group_by(replicate) %>% summarize(infected=sum(infected=="infected")) %>% mutate(prop_infected=infected/500)
+proportion4 %>% summarize(sd = sd(prop_infected))
+```
+
+
+The infected rate reflected in this plot is much greater than previous ones and the standard deviation is larger than that of part d and e but approximately equal to that of part b.
